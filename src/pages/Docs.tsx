@@ -312,7 +312,10 @@ export function Docs() {
                   <td>
                     <code>enhanceButtons()</code>
                   </td>
-                  <td>Inject mark into buttons missing an img</td>
+                  <td>
+                    Inject mark into buttons missing <code>.arjenhub-mark</code> — skip if you
+                    already render one img (calling it twice doubles the icon)
+                  </td>
                 </tr>
               </tbody>
             </table>

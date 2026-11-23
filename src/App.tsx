@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
+import { ArjenHubBoot } from './components/ArjenHubBoot';
 import { AuthGate } from './components/AuthGate';
 import { DeveloperGate } from './components/DeveloperGate';
 import { AuthProvider } from './lib/auth';
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ArjenHubBoot />
         <Routes>
           <Route element={<Landing />} path="/" />
           <Route element={<Docs />} path="/docs" />

@@ -1,11 +1,12 @@
 import { SSO_BASE } from './sso';
 
-/** OAuth redirect URI — must match the client’s registered redirect URIs exactly. */
-export const ARJENHUB_REDIRECT_URI = () => `${window.location.origin}/giris`;
+/** Canonical OAuth redirect — must match registered URI exactly (trailing slash). */
+export const arjenHubRedirectUri = () => `${window.location.origin}/`;
 
-export const ARJENHUB_CLIENT_ID = String(import.meta.env.VITE_ARJENHUB_CLIENT_ID ?? '').trim();
-
-export const ARJENHUB_MARK_URL = `${SSO_BASE.replace(/\/$/, '')}/arjenhub-mark.png`;
+export type ArjenHubConfig = {
+  ssoBase: string;
+  clientId: string;
+};
 
 export type ArjenHubUser = {
   name?: string;
@@ -34,6 +35,8 @@ export type ArjenHubAuthApi = {
   getAccessToken: () => string | null;
   getSession: () => ArjenHubSession | null;
   signOut: () => Promise<void> | void;
+  enhanceButtons?: () => void;
+  markUrl?: () => string;
 };
 
 declare global {
@@ -42,9 +45,22 @@ declare global {
   }
 }
 
+export function getArjenHubConfig(): ArjenHubConfig {
+  return {
+    ssoBase: SSO_BASE.replace(/\/$/, ''),
+    clientId: String(import.meta.env.VITE_ARJENHUB_CLIENT_ID ?? '').trim(),
+  };
+}
+
+/** @deprecated Prefer getArjenHubConfig().clientId */
+export const ARJENHUB_CLIENT_ID = String(import.meta.env.VITE_ARJENHUB_CLIENT_ID ?? '').trim();
+
+export const ARJENHUB_MARK_URL = `${SSO_BASE.replace(/\/$/, '')}/arjenhub-mark.png`;
+
 let loadPromise: Promise<ArjenHubAuthApi> | null = null;
 
-export function loadArjenHubSdk(): Promise<ArjenHubAuthApi> {
+/** Load arjenhub-auth.js once. Do not call enhanceButtons — buttons ship their own mark img. */
+export function ensureArjenHubSdk(): Promise<ArjenHubAuthApi> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('ArjenHub SDK requires a browser'));
   }
@@ -53,8 +69,8 @@ export function loadArjenHubSdk(): Promise<ArjenHubAuthApi> {
   }
   if (loadPromise) return loadPromise;
 
-  const base = SSO_BASE.replace(/\/$/, '');
-  const src = `${base}/arjenhub-auth.js`;
+  const { ssoBase, clientId } = getArjenHubConfig();
+  const src = `${ssoBase}/arjenhub-auth.js`;
 
   loadPromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
@@ -71,9 +87,9 @@ export function loadArjenHubSdk(): Promise<ArjenHubAuthApi> {
     const script = document.createElement('script');
     script.src = src;
     script.async = true;
-    script.dataset.ssoBase = base;
-    if (ARJENHUB_CLIENT_ID) {
-      script.dataset.clientId = ARJENHUB_CLIENT_ID;
+    script.dataset.ssoBase = ssoBase;
+    if (clientId) {
+      script.dataset.clientId = clientId;
     }
     script.onload = () => {
       if (window.ArjenHubAuth) resolve(window.ArjenHubAuth);
@@ -89,20 +105,50 @@ export function loadArjenHubSdk(): Promise<ArjenHubAuthApi> {
   return loadPromise;
 }
 
+/** Alias kept for call sites / copy-paste recipes. */
+export const loadArjenHubSdk = ensureArjenHubSdk;
+
 export async function signInWithArjenHub(): Promise<void> {
-  if (!ARJENHUB_CLIENT_ID) {
+  const { ssoBase, clientId } = getArjenHubConfig();
+  if (!clientId) {
     throw new Error('VITE_ARJENHUB_CLIENT_ID is not set');
   }
-  const api = await loadArjenHubSdk();
+  const api = await ensureArjenHubSdk();
   await api.signIn({
-    clientId: ARJENHUB_CLIENT_ID,
-    ssoBaseUrl: SSO_BASE.replace(/\/$/, ''),
-    redirectUri: ARJENHUB_REDIRECT_URI(),
+    clientId,
+    ssoBaseUrl: ssoBase,
+    redirectUri: arjenHubRedirectUri(),
   });
 }
 
 export async function handleArjenHubCallback(): Promise<ArjenHubSession | null> {
-  if (!ARJENHUB_CLIENT_ID) return null;
-  const api = await loadArjenHubSdk();
+  const { clientId } = getArjenHubConfig();
+  if (!clientId) return null;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('code') || !params.has('state')) return null;
+  const api = await ensureArjenHubSdk();
   return api.handleCallback();
+}
+
+export function getArjenHubUser(): ArjenHubUser | null {
+  return window.ArjenHubAuth?.getUser() ?? null;
+}
+
+export function getArjenHubSession(): ArjenHubSession | null {
+  return window.ArjenHubAuth?.getSession() ?? null;
+}
+
+/** Strip OAuth query params after a successful (or failed) callback exchange. */
+export function clearOAuthParamsFromUrl(): void {
+  const url = new URL(window.location.href);
+  let changed = false;
+  for (const key of ['code', 'state', 'error', 'error_description']) {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) {
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }
 }

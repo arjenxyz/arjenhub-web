@@ -7,6 +7,11 @@ type Props = {
   label?: string;
 };
 
+/**
+ * Single-mark Sign in with ArjenHub control.
+ * Renders one `.arjenhub-mark` img — never call SDK enhanceButtons() on this button
+ * (that would inject a second mark).
+ */
 export function ArjenHubSignInButton({
   busy = false,
   disabled = false,
@@ -23,7 +28,7 @@ export function ArjenHubSignInButton({
       <img
         alt=""
         aria-hidden="true"
-        className="btn__icon btn__icon--mark"
+        className="arjenhub-mark btn__icon btn__icon--mark"
         height={18}
         src={ARJENHUB_MARK_URL}
         width={18}

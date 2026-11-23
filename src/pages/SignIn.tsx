@@ -6,7 +6,8 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { SiteChrome } from '../components/SiteChrome';
 import {
   ARJENHUB_CLIENT_ID,
-  handleArjenHubCallback,
+  ensureArjenHubSdk,
+  getArjenHubUser,
   signInWithArjenHub,
   type ArjenHubUser,
 } from '../lib/arjenhubAuth';
@@ -27,24 +28,26 @@ export function SignIn() {
     null,
   );
 
+  // OAuth callback is handled once in ArjenHubBoot — here we only reflect existing SSO session.
   useEffect(() => {
+    if (!ARJENHUB_CLIENT_ID) return;
     let cancelled = false;
     void (async () => {
       try {
-        const session = await handleArjenHubCallback();
-        if (cancelled || !session) return;
-        // ArjenHub SSO ≠ Supabase session. Portal /panel still needs Google/email login
-        // unless a Supabase user is already present (handled by Navigate below).
-        const ssoUser = session.user ?? null;
-        if (ssoUser) setArjenHubUser(ssoUser);
-        const label = [ssoUser?.name, ssoUser?.email].filter(Boolean).join(' · ');
-        setInfo(
-          label
-            ? `ArjenHub ile giriş başarılı (${label}). Portal /panel için hâlâ Google veya e-posta ile giriş gerekir.`
-            : 'ArjenHub ile giriş başarılı. Portal /panel için hâlâ Google veya e-posta ile giriş gerekir.',
-        );
-      } catch (caught) {
-        if (!cancelled) setError(mapAuthError(caught));
+        await ensureArjenHubSdk();
+        if (cancelled) return;
+        const ssoUser = getArjenHubUser();
+        if (ssoUser) {
+          setArjenHubUser(ssoUser);
+          const label = [ssoUser.name, ssoUser.email].filter(Boolean).join(' · ');
+          setInfo(
+            label
+              ? `ArjenHub oturumu açık (${label}). Portal /panel için hâlâ Google veya e-posta ile giriş gerekir.`
+              : 'ArjenHub oturumu açık. Portal /panel için hâlâ Google veya e-posta ile giriş gerekir.',
+          );
+        }
+      } catch {
+        // SDK optional on this page when not signing in yet
       }
     })();
     return () => {
