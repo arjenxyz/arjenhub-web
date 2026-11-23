@@ -1,8 +1,15 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
+import { ArjenHubSignInButton } from '../components/ArjenHubSignInButton';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { SiteChrome } from '../components/SiteChrome';
+import {
+  ARJENHUB_CLIENT_ID,
+  handleArjenHubCallback,
+  signInWithArjenHub,
+  type ArjenHubUser,
+} from '../lib/arjenhubAuth';
 import { mapAuthError, useAuth } from '../lib/auth';
 
 export function SignIn() {
@@ -15,8 +22,37 @@ export function SignIn() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'password' | 'google' | 'magic' | 'reset' | null>(null);
+  const [arjenHubUser, setArjenHubUser] = useState<ArjenHubUser | null>(null);
+  const [busy, setBusy] = useState<'password' | 'google' | 'arjenhub' | 'magic' | 'reset' | null>(
+    null,
+  );
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const session = await handleArjenHubCallback();
+        if (cancelled || !session) return;
+        // ArjenHub SSO ≠ Supabase session. Portal /panel still needs Google/email login
+        // unless a Supabase user is already present (handled by Navigate below).
+        const ssoUser = session.user ?? null;
+        if (ssoUser) setArjenHubUser(ssoUser);
+        const label = [ssoUser?.name, ssoUser?.email].filter(Boolean).join(' · ');
+        setInfo(
+          label
+            ? `ArjenHub ile giriş başarılı (${label}). Portal /panel için hâlâ Google veya e-posta ile giriş gerekir.`
+            : 'ArjenHub ile giriş başarılı. Portal /panel için hâlâ Google veya e-posta ile giriş gerekir.',
+        );
+      } catch (caught) {
+        if (!cancelled) setError(mapAuthError(caught));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Supabase portal session wins — ArjenHub SSO alone does not unlock /panel.
   if (!loading && user) {
     return <Navigate replace to="/panel" />;
   }
@@ -42,6 +78,18 @@ export function SignIn() {
     setBusy('google');
     try {
       await signInWithGoogle();
+    } catch (caught) {
+      setError(mapAuthError(caught));
+      setBusy(null);
+    }
+  }
+
+  async function onArjenHub() {
+    setError(null);
+    setInfo(null);
+    setBusy('arjenhub');
+    try {
+      await signInWithArjenHub();
     } catch (caught) {
       setError(mapAuthError(caught));
       setBusy(null);
@@ -88,9 +136,28 @@ export function SignIn() {
     <SiteChrome compact>
       <main className="auth-panel">
         <h1 className="auth-panel__title">Giriş</h1>
-        <p className="auth-panel__lead">Google ile veya e-posta + şifre.</p>
+        <p className="auth-panel__lead">ArjenHub, Google veya e-posta + şifre.</p>
+
+        {arjenHubUser ? (
+          <p className="form-info" role="status">
+            ArjenHub oturumu: {[arjenHubUser.name, arjenHubUser.email].filter(Boolean).join(' · ') ||
+              'açık'}
+            . /panel için Google veya e-posta ile giriş yap.
+          </p>
+        ) : null}
 
         <div className="auth-oauth">
+          {ARJENHUB_CLIENT_ID ? (
+            <ArjenHubSignInButton
+              busy={busy === 'arjenhub'}
+              disabled={busy !== null && busy !== 'arjenhub'}
+              onClick={() => void onArjenHub()}
+            />
+          ) : (
+            <p className="auth-oauth__note">
+              Sign in with ArjenHub henüz yapılandırılmadı (VITE_ARJENHUB_CLIENT_ID).
+            </p>
+          )}
           <GoogleSignInButton
             busy={busy === 'google'}
             disabled={busy !== null && busy !== 'google'}

@@ -14,6 +14,24 @@ npm install
 npm run dev
 ```
 
+### Vercel
+
+Set **build-time** env vars (Vite inlines `VITE_*` during `npm run build`):
+
+| Name | Value |
+|------|--------|
+| `VITE_SUPABASE_URL` | Same as app `EXPO_PUBLIC_SUPABASE_URL` |
+| `VITE_SUPABASE_ANON_KEY` | Same as app publishable / anon key |
+| `VITE_ARJENHUB_CLIENT_ID` | Public OAuth client id for Sign in with ArjenHub on `/giris` |
+| `VITE_DEVELOPER_EMAIL` | (optional) owner email for `/panel/developer` |
+
+Then **Redeploy**. Without these, production used to white-screen; it now shows a config missing page.
+
+Also add SPA rewrite via `vercel.json` (already in repo): all routes → `index.html`.
+
+Supabase → **Authentication → URL Configuration** → Redirect URLs, add:
+`https://arjenhub-web.vercel.app/**` (and `/panel`, `/giris` if you prefer exact entries).
+
 ### Google sign-in
 
 1. Supabase → **Authentication → Providers → Google** → enable; paste Google Cloud OAuth Client ID + Secret.

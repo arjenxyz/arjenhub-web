@@ -1556,7 +1556,16 @@
 }
 
 .auth-oauth {
+  display: grid;
+  gap: 10px;
   margin-top: 22px;
+}
+
+.auth-oauth__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .auth-divider {
@@ -1596,6 +1605,22 @@
 
 .btn--google:hover {
   background: var(--bg-soft) !important;
+}
+
+.btn--arjenhub {
+  background: #fff !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong);
+  font-weight: 650;
+}
+
+.btn--arjenhub:hover {
+  background: var(--bg-soft) !important;
+}
+
+.btn__icon--mark {
+  border-radius: 4px;
+  object-fit: cover;
 }
 
 .field {
