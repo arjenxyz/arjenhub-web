@@ -9,10 +9,10 @@ import { useAuth } from '../lib/auth';
 
 /**
  * Run ArjenHub OAuth callback once at app boot (redirect_uri = origin/).
- * Portal UX: Supabase session → /panel; otherwise stay on current route with clean URL.
+ * A valid ArjenHub session alone unlocks /panel.
  */
 export function ArjenHubBoot() {
-  const { user, loading } = useAuth();
+  const { isAuthenticated, loading, setArjenHubSession } = useAuth();
   const navigate = useNavigate();
   const [oauthDone, setOauthDone] = useState(false);
 
@@ -23,6 +23,7 @@ export function ArjenHubBoot() {
         const session = await handleArjenHubCallback();
         if (cancelled) return;
         if (session) {
+          setArjenHubSession(session);
           clearOAuthParamsFromUrl();
           setOauthDone(true);
         }
@@ -34,14 +35,14 @@ export function ArjenHubBoot() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setArjenHubSession]);
 
   useEffect(() => {
     if (!oauthDone || loading) return;
-    if (user) {
+    if (isAuthenticated) {
       navigate('/panel', { replace: true });
     }
-  }, [oauthDone, loading, user, navigate]);
+  }, [oauthDone, loading, isAuthenticated, navigate]);
 
   return null;
 }

@@ -1,5 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 
+import type { ArjenHubUser } from './arjenhubAuth';
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
@@ -23,4 +25,31 @@ export function avatarUrlFromUser(user: User | null | undefined): string | null 
   if (typeof meta.avatar_url === 'string' && meta.avatar_url) return meta.avatar_url;
   if (typeof meta.picture === 'string' && meta.picture) return meta.picture;
   return null;
+}
+
+/** Prefer Supabase profile; fall back to ArjenHub SSO userinfo. */
+export function portalDisplayName(
+  user: User | null | undefined,
+  arjenHubUser: ArjenHubUser | null | undefined,
+): string {
+  if (user) return displayNameFromUser(user);
+  const fromArjen =
+    (typeof arjenHubUser?.name === 'string' && arjenHubUser.name.trim()) ||
+    (typeof arjenHubUser?.email === 'string' && arjenHubUser.email.split('@')[0]) ||
+    '';
+  return fromArjen || 'Account';
+}
+
+export function portalEmail(
+  user: User | null | undefined,
+  arjenHubUser: ArjenHubUser | null | undefined,
+): string | null {
+  return user?.email ?? arjenHubUser?.email ?? null;
+}
+
+export function portalAvatarUrl(
+  user: User | null | undefined,
+  arjenHubUser: ArjenHubUser | null | undefined,
+): string | null {
+  return avatarUrlFromUser(user) ?? (arjenHubUser?.avatar ? arjenHubUser.avatar : null);
 }

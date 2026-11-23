@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 import { BrandMark } from './BrandMark';
 import { useAuth } from '../lib/auth';
-import { avatarUrlFromUser, displayNameFromUser, initials } from '../lib/dashUser';
+import { initials, portalAvatarUrl, portalDisplayName, portalEmail } from '../lib/dashUser';
 import { isDeveloperEmail } from '../lib/developer';
 import { getIdentityCode } from '../lib/sso';
 
@@ -12,37 +12,49 @@ type DashShellProps = {
 };
 
 export function DashShell({ children }: DashShellProps) {
-  const { user, signOut } = useAuth();
+  const { user, arjenHubUser, isAuthenticated, signOut } = useAuth();
   const location = useLocation();
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [identityCode, setIdentityCode] = useState<string | null>(null);
+  const [identityNote, setIdentityNote] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
 
-  const displayName = displayNameFromUser(user);
-  const avatarUrl = avatarUrlFromUser(user);
-  const developer = isDeveloperEmail(user?.email);
+  const displayName = portalDisplayName(user, arjenHubUser);
+  const email = portalEmail(user, arjenHubUser);
+  const avatarUrl = portalAvatarUrl(user, arjenHubUser);
+  const developer = isDeveloperEmail(user?.email ?? arjenHubUser?.email);
   const onDeveloper = location.pathname.startsWith('/panel/developer');
 
   useEffect(() => {
-    if (!user) {
+    if (!isAuthenticated) {
       setIdentityCode(null);
+      setIdentityNote(null);
       return;
     }
     let active = true;
+    setIdentityNote(null);
     void getIdentityCode()
       .then((profile) => {
-        if (active) setIdentityCode(profile.identityCode);
+        if (!active) return;
+        setIdentityCode(profile.identityCode);
+        setIdentityNote(null);
       })
       .catch(() => {
-        if (active) setIdentityCode(null);
+        if (!active) return;
+        setIdentityCode(null);
+        if (!user) {
+          setIdentityNote(
+            'Kimlik kodu şu an kullanılamıyor (SSO API Supabase oturumu bekliyor olabilir). Profil açık kalır.',
+          );
+        }
       });
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -118,7 +130,7 @@ export function DashShell({ children }: DashShellProps) {
               <div className="dash__dropdown" id={menuId} role="menu">
                 <div className="dash__dropdown-head">
                   <strong>{displayName}</strong>
-                  <span>{user?.email ?? '—'}</span>
+                  <span>{email ?? '—'}</span>
                 </div>
 
                 {identityCode ? (
@@ -138,9 +150,13 @@ export function DashShell({ children }: DashShellProps) {
                       Use this 6-digit code to sign in with ArjenHub on connected sites.
                     </p>
                   </div>
+                ) : identityNote ? (
+                  <p className="dash__dropdown-code-hint" style={{ opacity: 0.7, margin: '0.5rem 0.75rem' }}>
+                    {identityNote}
+                  </p>
                 ) : null}
 
-                {developer ? (
+                {developer && user ? (
                   onDeveloper ? (
                     <Link
                       className="dash__dropdown-item"

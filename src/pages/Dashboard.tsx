@@ -1,10 +1,11 @@
 import { DashShell } from '../components/DashShell';
 import { useAuth } from '../lib/auth';
-import { displayNameFromUser, initials } from '../lib/dashUser';
+import { initials, portalDisplayName, portalEmail } from '../lib/dashUser';
 
 export function Dashboard() {
-  const { user } = useAuth();
-  const displayName = displayNameFromUser(user);
+  const { user, arjenHubUser } = useAuth();
+  const displayName = portalDisplayName(user, arjenHubUser);
+  const email = portalEmail(user, arjenHubUser);
 
   return (
     <DashShell>
@@ -24,10 +25,10 @@ export function Dashboard() {
         </div>
         <div className="dash__account-text">
           <strong>{displayName}</strong>
-          <span>{user?.email ?? '—'}</span>
+          <span>{email ?? '—'}</span>
         </div>
         <code className="dash__account-id" title="Account ID">
-          {user?.id ?? '—'}
+          {user?.id ?? 'ArjenHub SSO'}
         </code>
       </section>
     </DashShell>

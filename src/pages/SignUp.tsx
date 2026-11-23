@@ -7,7 +7,7 @@ import { mapAuthError, useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
 export function SignUp() {
-  const { user, loading, signUp, signInWithGoogle } = useAuth();
+  const { isAuthenticated, loading, signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [displayName, setDisplayName] = useState('');
@@ -17,7 +17,7 @@ export function SignUp() {
   const [busy, setBusy] = useState<'form' | 'google' | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  if (!loading && user) {
+  if (!loading && isAuthenticated) {
     return <Navigate replace to="/panel" />;
   }
 

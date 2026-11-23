@@ -1,3 +1,4 @@
+import { getArjenHubSession } from './arjenhubAuth';
 import { supabase } from './supabase';
 
 const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
@@ -61,15 +62,25 @@ export function buildEmbedSnippet(clientId: string): string {
 
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) {
-    throw new Error('Oturum gerekli. Tekrar giriş yapın.');
+  const supabaseToken = data.session?.access_token;
+  if (supabaseToken) {
+    return {
+      Authorization: `Bearer ${supabaseToken}`,
+      apikey: anonKey,
+      'Content-Type': 'application/json',
+    };
   }
-  return {
-    Authorization: `Bearer ${token}`,
-    apikey: anonKey,
-    'Content-Type': 'application/json',
-  };
+
+  const arjenToken = getArjenHubSession()?.accessToken ?? null;
+  if (arjenToken) {
+    return {
+      Authorization: `Bearer ${arjenToken}`,
+      ...(anonKey ? { apikey: anonKey } : {}),
+      'Content-Type': 'application/json',
+    };
+  }
+
+  throw new Error('Oturum gerekli. Tekrar giriş yapın.');
 }
 
 async function ssoFetch<T>(path: string, init?: RequestInit): Promise<T> {

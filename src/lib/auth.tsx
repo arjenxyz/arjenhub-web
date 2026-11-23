@@ -9,12 +9,24 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
+import {
+  ensureArjenHubSdk,
+  getArjenHubConfig,
+  getArjenHubSession,
+  type ArjenHubSession,
+  type ArjenHubUser,
+} from './arjenhubAuth';
 import { supabase } from './supabase';
 
 type AuthContextValue = {
   session: Session | null;
   user: User | null;
+  arjenHubSession: ArjenHubSession | null;
+  arjenHubUser: ArjenHubUser | null;
+  isAuthenticated: boolean;
   loading: boolean;
+  setArjenHubSession: (session: ArjenHubSession | null) => void;
+  refreshArjenHubSession: () => Promise<ArjenHubSession | null>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
@@ -54,16 +66,52 @@ function authRedirectTo(path: string): string {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [arjenHubSession, setArjenHubSessionState] = useState<ArjenHubSession | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const setArjenHubSession = useCallback((next: ArjenHubSession | null) => {
+    setArjenHubSessionState(next);
+  }, []);
+
+  const refreshArjenHubSession = useCallback(async () => {
+    const { clientId } = getArjenHubConfig();
+    if (!clientId) {
+      setArjenHubSessionState(null);
+      return null;
+    }
+    try {
+      await ensureArjenHubSdk();
+      const next = getArjenHubSession();
+      setArjenHubSessionState(next);
+      return next;
+    } catch {
+      setArjenHubSessionState(null);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
 
-    void supabase.auth.getSession().then(({ data }) => {
+    void (async () => {
+      const [{ data }, arjen] = await Promise.all([
+        supabase.auth.getSession(),
+        (async (): Promise<ArjenHubSession | null> => {
+          const { clientId } = getArjenHubConfig();
+          if (!clientId) return null;
+          try {
+            await ensureArjenHubSdk();
+            return getArjenHubSession();
+          } catch {
+            return null;
+          }
+        })(),
+      ]);
       if (!active) return;
       setSession(data.session);
+      setArjenHubSessionState(arjen);
       setLoading(false);
-    });
+    })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
@@ -126,15 +174,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    try {
+      const api = window.ArjenHubAuth;
+      if (api?.signOut) {
+        await api.signOut();
+      }
+    } catch {
+      /* best-effort ArjenHub logout */
+    }
+    setArjenHubSessionState(null);
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }, []);
 
+  const user = session?.user ?? null;
+  const arjenHubUser = arjenHubSession?.user ?? null;
+  const isAuthenticated = Boolean(user || arjenHubUser || arjenHubSession?.accessToken);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
-      user: session?.user ?? null,
+      user,
+      arjenHubSession,
+      arjenHubUser,
+      isAuthenticated,
       loading,
+      setArjenHubSession,
+      refreshArjenHubSession,
       signIn,
       signInWithGoogle,
       signInWithMagicLink,
@@ -144,7 +210,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       session,
+      user,
+      arjenHubSession,
+      arjenHubUser,
+      isAuthenticated,
       loading,
+      setArjenHubSession,
+      refreshArjenHubSession,
       signIn,
       signInWithGoogle,
       signInWithMagicLink,

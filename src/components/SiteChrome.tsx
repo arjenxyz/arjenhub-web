@@ -76,7 +76,7 @@ export function SiteChrome({
   children: React.ReactNode;
   compact?: boolean;
 }) {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
 
@@ -111,7 +111,7 @@ export function SiteChrome({
           </Link>
 
           <nav className="site-nav__desktop" aria-label="Ana">
-            {user ? (
+            {isAuthenticated ? (
               <Link className="site-nav__dashboard" to="/panel">
                 Dashboard
               </Link>
@@ -165,7 +165,7 @@ export function SiteChrome({
           </div>
 
           <div className="site-menu__actions">
-            {user ? (
+            {isAuthenticated ? (
               <Link className="site-menu__btn site-menu__btn--primary" onClick={closeMenu} to="/panel">
                 Panel
               </Link>
@@ -182,7 +182,7 @@ export function SiteChrome({
           </div>
 
           <nav aria-label="Mobil menü" className="site-menu__list">
-            {user ? (
+            {isAuthenticated ? (
               <Link onClick={closeMenu} to="/panel">
                 Hesap
               </Link>

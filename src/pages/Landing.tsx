@@ -6,7 +6,7 @@ import { SiteChrome } from '../components/SiteChrome';
 import { useAuth } from '../lib/auth';
 
 export function Landing() {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   return (
     <SiteChrome>
@@ -23,7 +23,7 @@ export function Landing() {
               <p className="hero__tagline">Private SSO for my own products.</p>
 
               <div className="hero__actions">
-                {user ? (
+                {isAuthenticated ? (
                   <Link className="btn btn--primary" to="/panel">
                     Open dashboard →
                   </Link>
