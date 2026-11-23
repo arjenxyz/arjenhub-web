@@ -1,0 +1,166 @@
+import { useState, type FormEvent } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
+import { SiteChrome } from '../components/SiteChrome';
+import { mapAuthError, useAuth } from '../lib/auth';
+
+export function SignIn() {
+  const { user, loading, signIn, signInWithGoogle, signInWithMagicLink, resetPassword } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from || '/panel';
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'password' | 'google' | 'magic' | 'reset' | null>(null);
+
+  if (!loading && user) {
+    return <Navigate replace to="/panel" />;
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setInfo(null);
+    setBusy('password');
+    try {
+      await signIn(email.trim(), password);
+      navigate(from, { replace: true });
+    } catch (caught) {
+      setError(mapAuthError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onGoogle() {
+    setError(null);
+    setInfo(null);
+    setBusy('google');
+    try {
+      await signInWithGoogle();
+    } catch (caught) {
+      setError(mapAuthError(caught));
+      setBusy(null);
+    }
+  }
+
+  async function onMagicLink() {
+    setError(null);
+    setInfo(null);
+    if (!email.trim()) {
+      setError('Magic link için e-posta gerekli.');
+      return;
+    }
+    setBusy('magic');
+    try {
+      await signInWithMagicLink(email.trim());
+      setInfo('Magic link gönderildi. Gelen kutunu (ve spam) kontrol et; link /panel’e açılır.');
+    } catch (caught) {
+      setError(mapAuthError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function onReset() {
+    setError(null);
+    setInfo(null);
+    if (!email.trim()) {
+      setError('Şifre sıfırlama için e-posta gerekli.');
+      return;
+    }
+    setBusy('reset');
+    try {
+      await resetPassword(email.trim());
+      setInfo('Şifre sıfırlama maili gönderildi (hesap varsa).');
+    } catch (caught) {
+      setError(mapAuthError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <SiteChrome compact>
+      <main className="auth-panel">
+        <h1 className="auth-panel__title">Giriş</h1>
+        <p className="auth-panel__lead">Google ile veya e-posta + şifre.</p>
+
+        <div className="auth-oauth">
+          <GoogleSignInButton
+            busy={busy === 'google'}
+            disabled={busy !== null && busy !== 'google'}
+            onClick={() => void onGoogle()}
+          />
+        </div>
+
+        <div className="auth-divider" aria-hidden="true">
+          <span>veya</span>
+        </div>
+
+        <form className="auth-form auth-form--tight" onSubmit={onSubmit}>
+          <label className="field">
+            <span>E-posta</span>
+            <input
+              autoComplete="email"
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              type="email"
+              value={email}
+            />
+          </label>
+          <label className="field">
+            <span>Şifre</span>
+            <input
+              autoComplete="current-password"
+              minLength={6}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              value={password}
+            />
+          </label>
+          {error ? (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {info ? (
+            <p className="form-info" role="status">
+              {info}
+            </p>
+          ) : null}
+          <button
+            className="btn btn--primary btn--block"
+            disabled={busy !== null || !password}
+            type="submit"
+          >
+            {busy === 'password' ? 'Giriş yapılıyor…' : 'Giriş yap'}
+          </button>
+          <button
+            className="btn btn--ghost btn--block"
+            disabled={busy !== null}
+            onClick={() => void onMagicLink()}
+            type="button"
+          >
+            {busy === 'magic' ? 'Gönderiliyor…' : 'Magic link gönder'}
+          </button>
+          <button
+            className="btn btn--ghost btn--block"
+            disabled={busy !== null}
+            onClick={() => void onReset()}
+            type="button"
+          >
+            {busy === 'reset' ? 'Gönderiliyor…' : 'Şifremi unuttum'}
+          </button>
+        </form>
+        <p className="auth-panel__footer">
+          Hesabın yok mu? <Link to="/kayit">Kayıt ol</Link>
+        </p>
+      </main>
+    </SiteChrome>
+  );
+}
